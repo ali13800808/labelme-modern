@@ -26,6 +26,18 @@
   <img src="examples/instance_segmentation/.readme/annotation.jpg" width="70%">
 </div>
 
+## About this fork
+
+`labelme-modern` is a fork of [wkentaro/labelme](https://github.com/wkentaro/labelme) (based on v5.6.1) with a set of UI/UX changes:
+
+- A modern flat dark theme (toolbar, dialogs, docks, scrollbars, etc.) instead of the stock Qt look.
+- **Delete File** no longer resets navigation to the first image — clicking **Next Image** afterward correctly advances to the file after the deleted one.
+- Labels can be removed from the autocomplete/suggestion list (right-click a label in the **Label List** panel → **Remove from Suggestions**) without touching existing annotations.
+- Opening a folder now scans every label file up front and populates the Label List/suggestions immediately, instead of only accumulating labels as you page through images.
+- The app remembers, per folder, which image you were last viewing, so reopening that folder later resumes there instead of jumping back to image 1.
+
+All credit for the original tool goes to [@wkentaro](https://github.com/wkentaro) and the labelme contributors. This fork keeps the same MIT license.
+
 ## Description
 
 Labelme is a graphical image annotation tool inspired by <http://labelme.csail.mit.edu>.  

@@ -24,6 +24,80 @@ class LabelQLineEdit(QtWidgets.QLineEdit):
             self.list_widget.keyPressEvent(e)
         else:
             super(LabelQLineEdit, self).keyPressEvent(e)
+            # Update text direction after key press
+            self._update_text_direction()
+
+    def _update_text_direction(self):
+        """Automatically detect and set text direction based on content"""
+        text = self.text()
+
+        if not text:
+            # Empty field: use LTR as default
+            self.setLayoutDirection(QtCore.Qt.LeftToRight)
+            self.setAlignment(QtCore.Qt.AlignLeft)
+        elif self._contains_rtl(text):
+            # Contains RTL characters: switch to RTL
+            self.setLayoutDirection(QtCore.Qt.RightToLeft)
+            self.setAlignment(QtCore.Qt.AlignRight)
+        else:
+            # Only LTR characters: use LTR
+            self.setLayoutDirection(QtCore.Qt.LeftToRight)
+            self.setAlignment(QtCore.Qt.AlignLeft)
+
+    def _contains_rtl(self, text):
+        """Check if text contains RTL characters (Persian, Arabic, Hebrew)"""
+        for char in text:
+            if '\u0600' <= char <= '\u06FF':  # Arabic/Persian
+                return True
+            if '\u0750' <= char <= '\u077F':  # Arabic Supplement
+                return True
+            if '\u0590' <= char <= '\u05FF':  # Hebrew
+                return True
+            if '\uFB50' <= char <= '\uFDFF':  # Arabic Presentation Forms-A
+                return True
+            if '\uFE70' <= char <= '\uFEFF':  # Arabic Presentation Forms-B
+                return True
+        return False
+
+
+class LabelQTextEdit(QtWidgets.QTextEdit):
+    """QTextEdit with automatic RTL/LTR detection"""
+
+    def __init__(self, *args, **kwargs):
+        super(LabelQTextEdit, self).__init__(*args, **kwargs)
+        self.textChanged.connect(self._update_text_direction)
+
+    def _update_text_direction(self):
+        """Automatically detect and set text direction based on content"""
+        text = self.toPlainText()
+
+        if not text:
+            # Empty field: use LTR as default
+            self.setLayoutDirection(QtCore.Qt.LeftToRight)
+            self.setAlignment(QtCore.Qt.AlignLeft)
+        elif self._contains_rtl(text):
+            # Contains RTL characters: switch to RTL
+            self.setLayoutDirection(QtCore.Qt.RightToLeft)
+            self.setAlignment(QtCore.Qt.AlignRight)
+        else:
+            # Only LTR characters: use LTR
+            self.setLayoutDirection(QtCore.Qt.LeftToRight)
+            self.setAlignment(QtCore.Qt.AlignLeft)
+
+    def _contains_rtl(self, text):
+        """Check if text contains RTL characters (Persian, Arabic, Hebrew)"""
+        for char in text:
+            if '\u0600' <= char <= '\u06FF':  # Arabic/Persian
+                return True
+            if '\u0750' <= char <= '\u077F':  # Arabic Supplement
+                return True
+            if '\u0590' <= char <= '\u05FF':  # Hebrew
+                return True
+            if '\uFB50' <= char <= '\uFDFF':  # Arabic Presentation Forms-A
+                return True
+            if '\uFE70' <= char <= '\uFEFF':  # Arabic Presentation Forms-B
+                return True
+        return False
 
 
 class LabelDialog(QtWidgets.QDialog):
@@ -44,6 +118,8 @@ class LabelDialog(QtWidgets.QDialog):
 
         super(LabelDialog, self).__init__(parent)
         self.edit = LabelQLineEdit()
+        # Enable bidirectional text support (RTL + LTR)
+        self.edit.setCursorPosition(0)
         self.edit.setPlaceholderText(text)
         self.edit.setValidator(labelme.utils.labelValidator())
         self.edit.editingFinished.connect(self.postProcess)
@@ -98,7 +174,8 @@ class LabelDialog(QtWidgets.QDialog):
         layout.addItem(self.flagsLayout)
         self.edit.textChanged.connect(self.updateFlags)
         # text edit
-        self.editDescription = QtWidgets.QTextEdit()
+        self.editDescription = LabelQTextEdit()
+        self.editDescription.setAcceptRichText(False)
         self.editDescription.setPlaceholderText("Label description")
         self.editDescription.setFixedHeight(50)
         layout.addWidget(self.editDescription)
@@ -129,6 +206,10 @@ class LabelDialog(QtWidgets.QDialog):
         self.labelList.addItem(label)
         if self._sort_labels:
             self.labelList.sortItems()
+
+    def removeLabelHistory(self, label):
+        for item in self.labelList.findItems(label, QtCore.Qt.MatchExactly):
+            self.labelList.takeItem(self.labelList.row(item))
 
     def labelSelected(self, item):
         self.edit.setText(item.text())

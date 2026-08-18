@@ -30,6 +30,11 @@ class UniqueLabelQListWidget(EscapableQListWidget):
 
     def setItemLabel(self, item, label, color=None):
         qlabel = QtWidgets.QLabel()
+        # Rich text (the <font> tag below) doesn't reliably inherit the
+        # app-wide stylesheet's text color, so set it explicitly here to
+        # match the modern theme instead of falling back to Qt's default
+        # (black, invisible against the dark background).
+        qlabel.setStyleSheet("color: #dcdcdc; background: transparent;")
         if color is None:
             qlabel.setText("{}".format(label))
         else:
@@ -40,6 +45,15 @@ class UniqueLabelQListWidget(EscapableQListWidget):
             )
         qlabel.setAlignment(Qt.AlignBottom)
 
-        item.setSizeHint(qlabel.sizeHint())
+        # The app stylesheet gives QListWidget::item padding (see
+        # styles/modern.qss). For items with a custom item widget, Qt
+        # carves that padding out of the reserved size-hint rect rather
+        # than growing the row to fit it, which without this compensation
+        # squeezes the label down to just a few pixels tall and clips the
+        # text away. Pad the hint so the label keeps its natural size.
+        size_hint = qlabel.sizeHint()
+        size_hint.setWidth(size_hint.width() + 12)
+        size_hint.setHeight(size_hint.height() + 12)
+        item.setSizeHint(size_hint)
 
         self.setItemWidget(item, qlabel)

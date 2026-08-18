@@ -195,6 +195,11 @@ def main():
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("icon"))
     app.installTranslator(translator)
+    app.setStyle("Fusion")
+    qss_path = osp.join(osp.dirname(osp.abspath(__file__)), "styles", "modern.qss")
+    if osp.exists(qss_path):
+        with codecs.open(qss_path, "r", encoding="utf-8") as f:
+            app.setStyleSheet(f.read())
     win = MainWindow(
         config=config,
         filename=filename,

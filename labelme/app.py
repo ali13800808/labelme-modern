@@ -2,6 +2,7 @@
 
 import functools
 import html
+import json
 import math
 import os
 import os.path as osp
@@ -134,6 +135,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr(
                 "Select label to start annotating for it. " "Press 'Esc' to deselect."
             )
+        )
+        # Labels the user removed from the suggestion list. Kept for the
+        # lifetime of the app so they don't come back when navigating
+        # between images that still contain shapes with these labels.
+        self._deleted_unique_labels = set()
+        self.uniqLabelList.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.uniqLabelList.customContextMenuRequested.connect(
+            self.popUniqueLabelListMenu
         )
         if self._config["labels"]:
             for label in self._config["labels"]:
@@ -621,6 +630,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.labelList.setContextMenuPolicy(Qt.CustomContextMenu)
         self.labelList.customContextMenuRequested.connect(self.popLabelListMenu)
 
+        # Unique label list ("Label List" dock) context menu, lets the user
+        # stop a label from being suggested in the label text box.
+        removeUniqueLabel = action(
+            self.tr("Remove from Suggestions"),
+            self.deleteSelectedUniqueLabels,
+            None,
+            "delete",
+            self.tr(
+                "Stop suggesting the selected label(s) in the label text "
+                "box. Existing annotations keep their labels."
+            ),
+        )
+        uniqueLabelMenu = QtWidgets.QMenu()
+        utils.addActions(uniqueLabelMenu, (removeUniqueLabel,))
+
         # Store actions for further handling.
         self.actions = utils.struct(
             saveAuto=saveAuto,
@@ -722,6 +746,7 @@ class MainWindow(QtWidgets.QMainWindow):
             help=self.menu(self.tr("&Help")),
             recentFiles=QtWidgets.QMenu(self.tr("Open &Recent")),
             labelList=labelMenu,
+            uniqueLabelList=uniqueLabelMenu,
         )
 
         utils.addActions(
@@ -881,6 +906,14 @@ class MainWindow(QtWidgets.QMainWindow):
         # Restore application settings.
         self.settings = QtCore.QSettings("labelme", "labelme")
         self.recentFiles = self.settings.value("recentFiles", []) or []
+        # Remembers, per opened folder, which image was last viewed there,
+        # so reopening the same folder later resumes where you left off.
+        try:
+            self._dir_last_file = json.loads(
+                self.settings.value("dirLastFile", "{}") or "{}"
+            )
+        except ValueError:
+            self._dir_last_file = {}
         size = self.settings.value("window/size", QtCore.QSize(600, 500))
         position = self.settings.value("window/position", QtCore.QPoint(0, 0))
         state = self.settings.value("window/state", QtCore.QByteArray())
@@ -917,6 +950,8 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.setObjectName("%sToolBar" % title)
         # toolbar.setOrientation(Qt.Vertical)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        toolbar.setIconSize(QtCore.QSize(28, 28))
+        toolbar.setMovable(False)
         if actions:
             utils.addActions(toolbar, actions)
         self.addToolBar(Qt.TopToolBarArea, toolbar)
@@ -1081,6 +1116,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.recentFiles.pop()
         self.recentFiles.insert(0, filename)
 
+    def rememberDirLastFile(self, dirpath, filename):
+        """Record which file was last viewed in `dirpath` so reopening the
+        same folder later can resume from there instead of image 1."""
+        if not dirpath or not filename:
+            return
+        self._dir_last_file[dirpath] = filename
+        self.settings.setValue("dirLastFile", json.dumps(self._dir_last_file))
+
     # Callbacks
 
     def undoShapeEdit(self):
@@ -1147,6 +1190,37 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def popLabelListMenu(self, point):
         self.menus.labelList.exec_(self.labelList.mapToGlobal(point))
+
+    def popUniqueLabelListMenu(self, point):
+        item = self.uniqLabelList.itemAt(point)
+        if item is not None and not item.isSelected():
+            self.uniqLabelList.clearSelection()
+            item.setSelected(True)
+        if not self.uniqLabelList.selectedItems():
+            return
+        self.menus.uniqueLabelList.exec_(self.uniqLabelList.mapToGlobal(point))
+
+    def deleteSelectedUniqueLabels(self):
+        items = self.uniqLabelList.selectedItems()
+        if not items:
+            return
+        labels = sorted({item.data(Qt.UserRole) for item in items})
+
+        mb = QtWidgets.QMessageBox
+        msg = self.tr(
+            "Stop suggesting the following label(s) in the label text "
+            "box?\n\n{}\n\nExisting annotations keep their labels."
+        ).format("\n".join(labels))
+        answer = mb.warning(self, self.tr("Remove Labels"), msg, mb.Yes | mb.No)
+        if answer != mb.Yes:
+            return
+
+        for label in labels:
+            self._deleted_unique_labels.add(label)
+            item = self.uniqLabelList.findItemByLabel(label)
+            if item is not None:
+                item.setHidden(True)
+            self.labelDialog.removeLabelHistory(label)
 
     def validateLabel(self, label):
         # no validation
@@ -1258,6 +1332,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.uniqLabelList.addItem(item)
                 rgb = self._get_rgb_by_label(shape.label)
                 self.uniqLabelList.setItemLabel(item, shape.label, rgb)
+                item.setHidden(shape.label in self._deleted_unique_labels)
 
     def fileSearchChanged(self):
         self.importDirImages(
@@ -1312,7 +1387,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.uniqLabelList.addItem(item)
             rgb = self._get_rgb_by_label(shape.label)
             self.uniqLabelList.setItemLabel(item, shape.label, rgb)
-        self.labelDialog.addLabelHistory(shape.label)
+            item.setHidden(shape.label in self._deleted_unique_labels)
+        if shape.label not in self._deleted_unique_labels:
+            self.labelDialog.addLabelHistory(shape.label)
         for action in self.actions.onShapesPresent:
             action.setEnabled(True)
 
@@ -1340,6 +1417,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.uniqLabelList.addItem(item)
                 rgb = self._get_rgb_by_label(label)
                 self.uniqLabelList.setItemLabel(item, label, rgb)
+                item.setHidden(label in self._deleted_unique_labels)
             label_id = self.uniqLabelList.indexFromItem(item).row() + 1
             label_id += self._config["shift_auto_shape_color"]
             return LABEL_COLORMAP[label_id % len(LABEL_COLORMAP)]
@@ -1761,6 +1839,7 @@ class MainWindow(QtWidgets.QMainWindow):
             dialog.onNewValue(None)
         self.paintCanvas()
         self.addRecentFile(self.filename)
+        self.rememberDirLastFile(self.lastOpenDir, self.filename)
         self.toggleActions(True)
         self.canvas.setFocus()
         self.status(str(self.tr("Loaded %s")) % osp.basename(str(filename)))
@@ -2040,7 +2119,9 @@ class MainWindow(QtWidgets.QMainWindow):
             item = self.fileListWidget.currentItem()
             item.setCheckState(Qt.Unchecked)
 
+            current_filename = self.filename
             self.resetState()
+            self.filename = current_filename
 
     # Message Dialogs. #
     def hasLabels(self):
@@ -2200,6 +2281,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 filenames = [f for f in filenames if re.search(pattern, f)]
             except re.error:
                 pass
+        label_files = []
         for filename in filenames:
             label_file = osp.splitext(filename)[0] + ".json"
             if self.output_dir:
@@ -2209,10 +2291,62 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(label_file):
                 item.setCheckState(Qt.Checked)
+                label_files.append(label_file)
             else:
                 item.setCheckState(Qt.Unchecked)
             self.fileListWidget.addItem(item)
-        self.openNextImg(load=load)
+        self.preloadUniqueLabels(label_files)
+
+        # Resume on whichever image was last viewed in this folder, rather
+        # than always jumping back to the first one.
+        resume_filename = self._dir_last_file.get(dirpath)
+        if load and resume_filename and resume_filename in self.imageList:
+            self.loadFile(resume_filename)
+        else:
+            self.openNextImg(load=load)
+
+    def preloadUniqueLabels(self, label_files):
+        """Collect every label used across the label files of a newly
+        opened folder so they all show up as suggestions right away,
+        instead of only accumulating as the user pages through images."""
+        if not label_files:
+            return
+
+        self.statusBar().showMessage(
+            self.tr("Scanning labels in %d file(s)...") % len(label_files)
+        )
+        self.statusBar().show()
+        QtWidgets.QApplication.processEvents()
+
+        labels = set()
+        for label_file in label_files:
+            try:
+                with open(label_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, ValueError) as e:
+                logger.warning(
+                    "Failed to read labels from {}: {}".format(label_file, e)
+                )
+                continue
+            for shape in data.get("shapes", []):
+                label = shape.get("label")
+                if label:
+                    labels.add(label)
+
+        for label in sorted(labels):
+            if self.uniqLabelList.findItemByLabel(label) is None:
+                item = self.uniqLabelList.createItemFromLabel(label)
+                self.uniqLabelList.addItem(item)
+                rgb = self._get_rgb_by_label(label)
+                self.uniqLabelList.setItemLabel(item, label, rgb)
+                item.setHidden(label in self._deleted_unique_labels)
+            if label not in self._deleted_unique_labels:
+                self.labelDialog.addLabelHistory(label)
+
+        self.statusBar().showMessage(
+            self.tr("Found %d unique label(s) in the folder.") % len(labels)
+        )
+        self.statusBar().show()
 
     def scanAllImages(self, folderPath):
         extensions = [
