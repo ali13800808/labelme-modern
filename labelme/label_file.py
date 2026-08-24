@@ -2,7 +2,9 @@ import base64
 import contextlib
 import io
 import json
+import os
 import os.path as osp
+import tempfile
 
 import PIL.Image
 from loguru import logger
@@ -184,8 +186,28 @@ class LabelFile(object):
             assert key not in data
             data[key] = value
         try:
-            with open(filename, "w") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            # Write to a temp file first and atomically swap it into place,
+            # so a crash/kill/power-loss mid-write can never leave `filename`
+            # truncated or corrupted -- the original stays intact until the
+            # new content is fully written.
+            dirname = osp.dirname(osp.abspath(filename)) or "."
+            fd, tmp_path = tempfile.mkstemp(
+                dir=dirname,
+                prefix=".{}.".format(osp.basename(filename)),
+                suffix=".tmp",
+            )
+            os.close(fd)
+            try:
+                # Use io.open directly (not this module's open() wrapper
+                # above, which never closes its file) so the handle is
+                # guaranteed closed before the replace below.
+                with io.open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_path, filename)
+            except Exception:
+                if osp.exists(tmp_path):
+                    os.remove(tmp_path)
+                raise
             self.filename = filename
         except Exception as e:
             raise LabelFileError(e)

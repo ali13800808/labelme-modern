@@ -47,6 +47,49 @@ def _setup_loguru(logger_level: str) -> None:
     )
 
 
+def _apply_windows_dark_titlebar(window):
+    """Ask DWM to draw the native title bar in dark mode (Windows 10 2004+/11),
+    matching the app's dark theme. No-op (and safe to fail) elsewhere.
+
+    Something during MainWindow's own setup makes a single call unreliable,
+    so this reapplies a few times over the first couple of seconds after
+    show() to make sure it sticks."""
+    if sys.platform != "win32":
+        return
+
+    def _set():
+        try:
+            import ctypes
+
+            hwnd = int(window.winId())
+            value = ctypes.c_int(1)
+            for attribute in (20, 19):  # DWMWA_USE_IMMERSIVE_DARK_MODE, old/new
+                result = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, attribute, ctypes.byref(value), ctypes.sizeof(value)
+                )
+                if result == 0:
+                    break
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_NOZORDER = 0x0004
+            SWP_FRAMECHANGED = 0x0020
+            ctypes.windll.user32.SetWindowPos(
+                hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            )
+        except Exception:
+            pass
+
+    _set()
+    for delay_ms in (100, 300, 600, 1000, 2000):
+        QtCore.QTimer.singleShot(delay_ms, _set)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", "-V", action="store_true", help="show version")
@@ -214,6 +257,8 @@ def main():
 
     with logger.catch():
         win.show()
+        app.processEvents()
+        _apply_windows_dark_titlebar(win)
         win.raise_()
         sys.exit(app.exec_())
 
