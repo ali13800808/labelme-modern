@@ -47,15 +47,15 @@ class LabelQLineEdit(QtWidgets.QLineEdit):
     def _contains_rtl(self, text):
         """Check if text contains RTL characters (Persian, Arabic, Hebrew)"""
         for char in text:
-            if '\u0600' <= char <= '\u06FF':  # Arabic/Persian
+            if "\u0600" <= char <= "\u06FF":  # Arabic/Persian
                 return True
-            if '\u0750' <= char <= '\u077F':  # Arabic Supplement
+            if "\u0750" <= char <= "\u077F":  # Arabic Supplement
                 return True
-            if '\u0590' <= char <= '\u05FF':  # Hebrew
+            if "\u0590" <= char <= "\u05FF":  # Hebrew
                 return True
-            if '\uFB50' <= char <= '\uFDFF':  # Arabic Presentation Forms-A
+            if "\uFB50" <= char <= "\uFDFF":  # Arabic Presentation Forms-A
                 return True
-            if '\uFE70' <= char <= '\uFEFF':  # Arabic Presentation Forms-B
+            if "\uFE70" <= char <= "\uFEFF":  # Arabic Presentation Forms-B
                 return True
         return False
 
@@ -87,15 +87,15 @@ class LabelQTextEdit(QtWidgets.QTextEdit):
     def _contains_rtl(self, text):
         """Check if text contains RTL characters (Persian, Arabic, Hebrew)"""
         for char in text:
-            if '\u0600' <= char <= '\u06FF':  # Arabic/Persian
+            if "\u0600" <= char <= "\u06FF":  # Arabic/Persian
                 return True
-            if '\u0750' <= char <= '\u077F':  # Arabic Supplement
+            if "\u0750" <= char <= "\u077F":  # Arabic Supplement
                 return True
-            if '\u0590' <= char <= '\u05FF':  # Hebrew
+            if "\u0590" <= char <= "\u05FF":  # Hebrew
                 return True
-            if '\uFB50' <= char <= '\uFDFF':  # Arabic Presentation Forms-A
+            if "\uFB50" <= char <= "\uFDFF":  # Arabic Presentation Forms-A
                 return True
-            if '\uFE70' <= char <= '\uFEFF':  # Arabic Presentation Forms-B
+            if "\uFE70" <= char <= "\uFEFF":  # Arabic Presentation Forms-B
                 return True
         return False
 
