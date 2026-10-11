@@ -36,7 +36,7 @@
 - Opening a folder now scans every label file up front and populates the Label List/suggestions immediately, instead of only accumulating labels as you page through images.
 - The app remembers, per folder, which image you were last viewing, so reopening that folder later resumes there instead of jumping back to image 1.
 
-All credit for the original tool goes to [@wkentaro](https://github.com/wkentaro) and the labelme contributors. This fork keeps the same MIT license.
+All credit for the original tool goes to [@wkentaro](https://github.com/wkentaro) and the labelme contributors. This fork keeps the same license (GNU GPL v3 or later, see [LICENSE](LICENSE)).
 
 ## Description
 
