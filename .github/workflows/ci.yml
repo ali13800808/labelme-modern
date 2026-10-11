@@ -11,10 +11,12 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         python-version: ['3.9']
-        PYTEST_QT_API: [pyqt5, pyside2]
+        # pytest-qt no longer accepts pyside2, so only pyqt5 is tested.
+        PYTEST_QT_API: [pyqt5]
 
     steps:
     - uses: actions/checkout@v2
