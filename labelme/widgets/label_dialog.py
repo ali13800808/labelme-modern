@@ -65,9 +65,21 @@ class LabelQTextEdit(QtWidgets.QTextEdit):
 
     def __init__(self, *args, **kwargs):
         super(LabelQTextEdit, self).__init__(*args, **kwargs)
+        self._updating_direction = False
         self.textChanged.connect(self._update_text_direction)
 
     def _update_text_direction(self):
+        # setAlignment() edits the document, which emits textChanged again and
+        # would re-enter this slot without end (stack overflow on Windows).
+        if self._updating_direction:
+            return
+        self._updating_direction = True
+        try:
+            self._apply_text_direction()
+        finally:
+            self._updating_direction = False
+
+    def _apply_text_direction(self):
         """Automatically detect and set text direction based on content"""
         text = self.toPlainText()
 

@@ -893,6 +893,18 @@ class MainWindow(QtWidgets.QMainWindow):
             Qt.Vertical: {},
         }  # key=filename, value=scroll_value
 
+        # Settings must exist before importDirImages() below, which consults
+        # the per-folder "last viewed image" map.
+        self.settings = QtCore.QSettings("labelme", "labelme")
+        # Remembers, per opened folder, which image was last viewed there,
+        # so reopening the same folder later resumes where you left off.
+        try:
+            self._dir_last_file = json.loads(
+                self.settings.value("dirLastFile", "{}") or "{}"
+            )
+        except ValueError:
+            self._dir_last_file = {}
+
         if filename is not None and osp.isdir(filename):
             self.importDirImages(filename, load=False)
         else:
@@ -904,16 +916,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # XXX: Could be completely declarative.
         # Restore application settings.
-        self.settings = QtCore.QSettings("labelme", "labelme")
         self.recentFiles = self.settings.value("recentFiles", []) or []
-        # Remembers, per opened folder, which image was last viewed there,
-        # so reopening the same folder later resumes where you left off.
-        try:
-            self._dir_last_file = json.loads(
-                self.settings.value("dirLastFile", "{}") or "{}"
-            )
-        except ValueError:
-            self._dir_last_file = {}
         size = self.settings.value("window/size", QtCore.QSize(600, 500))
         position = self.settings.value("window/position", QtCore.QPoint(0, 0))
         state = self.settings.value("window/state", QtCore.QByteArray())
